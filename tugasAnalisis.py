@@ -2,8 +2,10 @@ import matplotlib.pyplot as plt
 import time
 import random
 import sys
+import numpy as np 
+from scipy.interpolate import make_interp_spline
 
-# Perbesar batas rekursi untuk menangani N yang agak besar
+# batas rekursi
 sys.setrecursionlimit(100000)
 
 def bubble_sort_iterative(arr):
@@ -34,16 +36,18 @@ def bubble_sort_recursive(arr, n):
 
 def main():
     print("==============================================================")
-    print("   Logika Sorting Angka Terbesar ke Terkecil (SATUAN DETIK)")
+    print("   Bubble Sort : Terbesar ke Terkecil (Worst Case)")
     print("==============================================================")
     
     try:
-        # 1. Input User
-        num_scenarios = int(input("Masukkan jumlah skenario percobaan (misal: 3): "))
+        num_scenarios = int(input("Masukkan jumlah skenario percobaan (misal: 5): "))
         input_sizes = []
         for i in range(num_scenarios):
-            n = int(input(f"Masukkan nilai n (jumlah angka random) ke-{i+1}: "))
+            n = int(input(f"Masukkan nilai n (jumlah angka) ke-{i+1}: "))
             input_sizes.append(n)
+        
+        input_sizes.sort()
+        
     except ValueError:
         print("Input harus berupa angka!")
         return
@@ -57,50 +61,81 @@ def main():
     print("+----------+---------------------------+---------------------------+")
 
     for n in input_sizes:
-        data_original = [random.randint(1, 10000) for _ in range(n)]
+        # Agar grafik stabil naik kita gunakan data random
+        # yang diurutkan terbalik (Descending) sebelum disorting.
+        raw_random = [random.randint(1, 10000) for _ in range(n)]
+        data_master = sorted(raw_random, reverse=True)
         
-        data_iter = data_original.copy()
-        data_rec = data_original.copy()
+        # DUPLIKASI DATA
+        data_iter = data_master.copy() 
+        data_rec  = data_master.copy() 
 
-        #UKUR ITERATIF
+        #  UKUR ITERATIF 
         start_time = time.perf_counter()
         bubble_sort_iterative(data_iter)
         end_time = time.perf_counter()
         
-        #UKUR REKURSIF
-        time_iter = (end_time - start_time)
+        time_iter = end_time - start_time 
         iterative_times.append(time_iter)
 
+        #  UKUR REKURSIF 
         time_rec = -1.0
         try:
             start_time = time.perf_counter()
             bubble_sort_recursive(data_rec, n)
             end_time = time.perf_counter()
             
-            time_rec = (end_time - start_time)
+            time_rec = end_time - start_time
             recursive_times.append(time_rec)
         except RecursionError:
             time_rec = -1.0
             recursive_times.append(None)
+
         str_rec = "StackOverflow" if time_rec == -1.0 else f"{time_rec:.6f}"
         str_iter = f"{time_iter:.6f}"
         
         print(f"| {n:<8} | {str_rec:<25} | {str_iter:<25} |")
 
     print("+----------+---------------------------+---------------------------+")
-    print("Processing selesai. Menampilkan grafik...")
+    print("Processing selesai. Menampilkan grafik stabil...")
 
-    #Membuat Grafik
+    # MEMBUAT GRAFIK
     plt.figure(figsize=(10, 6))
-    
-    plt.plot(input_sizes, iterative_times, marker='o', linestyle='-', color='blue', label='Iterative')
-    
-    rec_x = [n for i, n in enumerate(input_sizes) if recursive_times[i] is not None]
-    rec_y = [t for t in recursive_times if t is not None]
-    
-    plt.plot(rec_x, rec_y, marker='o', linestyle='-', color='red', label='Recursive')
 
-    plt.title('Performance Comparison: Recursive vs Iterative')
+    x = np.array(input_sizes)
+    y_iter = np.array(iterative_times)
+
+    # Plot Iterative
+    x_new = np.linspace(x.min(), x.max(), 300) 
+    
+    try:
+        spl_iter = make_interp_spline(x, y_iter, k=2) 
+        y_smooth_iter = spl_iter(x_new)
+        plt.plot(x_new, y_smooth_iter, color='blue', linestyle='-', label='Iterative (Smooth)')
+    except:
+        plt.plot(x, y_iter, color='blue', linestyle='-', label='Iterative')
+
+    plt.scatter(x, y_iter, color='blue')
+
+    # Plot Recursive
+    rec_valid_indices = [i for i, val in enumerate(recursive_times) if val is not None]
+    
+    if len(rec_valid_indices) > 1:
+        x_rec = np.array([input_sizes[i] for i in rec_valid_indices])
+        y_rec = np.array([recursive_times[i] for i in rec_valid_indices])
+        
+        x_new_rec = np.linspace(x_rec.min(), x_rec.max(), 300)
+        
+        try:
+            spl_rec = make_interp_spline(x_rec, y_rec, k=2)
+            y_smooth_rec = spl_rec(x_new_rec)
+            plt.plot(x_new_rec, y_smooth_rec, color='red', linestyle='-', label='Recursive (Smooth)')
+        except:
+             plt.plot(x_rec, y_rec, color='red', linestyle='-', label='Recursive')
+
+        plt.scatter(x_rec, y_rec, color='red')
+
+    plt.title('Bubble Sort Performance: Worst Case Scenario (Reverse Sorted)')
     plt.xlabel('Input Size (n)')
     plt.ylabel('Execution Time (seconds)')
     plt.grid(True)
